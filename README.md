@@ -1,6 +1,10 @@
 # mass-action
  UX for mass actions
 
+## Prelogue
+This project uses [crud-stub](https://github.com/MatheusFS/crud-stub) as base CRUD design pattern
+and [polid](https://github.com/MatheusFS/polid) as base CSS
+
 # Instalation
 
 ```html
