@@ -1,0 +1,79 @@
+[massaction] {
+    cursor: pointer;
+}
+
+button#massaction-fab {
+    z-index: 2;
+}
+
+input[type=checkbox]:checked+.hoverable-opacity-2 {
+    opacity: 0.75
+}
+
+input[type=checkbox]:checked+[massaction] {
+    box-shadow: #3490dc 0px 0px 4px;
+    background-color: #3490dc44;
+}
+
+ul#massaction-actions {
+    position: fixed;
+    right: 26px;
+    bottom: 80px;
+    list-style-type: none;
+    transition: 1s all;
+    opacity: 0;
+    margin: 0;
+    padding: 0;
+}
+
+ul#massaction-actions:hover {
+    opacity: 1;
+}
+
+ul#massaction-actions li {
+    transform: translateY(90px);
+    transition: inherit;
+    margin-bottom: 10px;
+    padding: 8px 8px 8px 16px;
+}
+
+ul#massaction-actions li:hover {
+    opacity: 1;
+    background-color: #FFFFFFCC;
+    box-shadow: #333 0px 0px 2px
+}
+
+ul#massaction-actions li>label {
+    opacity: 0;
+    transition: inherit
+}
+
+ul#massaction-actions li:hover>label {
+    opacity: 1
+}
+
+ul#massaction-actions li button {
+    transform: scale(0.4);
+    transition: inherit;
+}
+
+button#massaction-fab:hover+ul#massaction-actions {
+    /* transform: translateY(0); */
+    opacity: 1;
+}
+
+button#massaction-fab:hover+ul#massaction-actions li,
+ul#massaction-actions:hover li {
+    transform: translateY(0)
+}
+
+button#massaction-fab:hover+ul#massaction-actions li button,
+ul#massaction-actions:hover li button {
+    transform: scale(1)
+}
+
+#contextmenu li {
+    display: grid;
+    grid-template-columns: 30px auto 80px;
+    grid-gap: 4px;
+}

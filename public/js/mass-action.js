@@ -1,26 +1,29 @@
 class massAction {
 
-    constructor(elements, actions) {
+    constructor(canvas, elements, actions, excludedSelectors, reloadAfterDone = 1) {
 
         this._elements = elements;
         this._actions = actions;
+        this._reloadAfterDone = reloadAfterDone;
 
-        this.items = [];
-        this.selected = [];
         this._mapElements();
-        this._supportAreaSelection('body', ['#contextmenu', 'button', 'a', '.modal','nav']);
+        this._supportAreaSelection(canvas, excludedSelectors);
+
+        this.selected = [];
     }
 
     _isEventAllowed(event){
-
-        let flag = true;
-        this._excludedSelectors.forEach(selector => $(event.target).closest(selector).length == 1 ? flag = false : null);
-        return flag;
+        
+        return !this._excludedSelectors.some(selector => $(event.target).closest(selector).length);
     }
 
-    _assignActionsClickEvents(){
+    _assignActionsEvents(){
 
-        this._actions.forEach(action => $(`[name="${action.name}"]`).click(this._doAction.bind(this, action)));
+        this._actions.forEach(action => {
+
+            $(`[name="${action.name}"]`).click(this._confirmAction.bind(this, action));
+            $(this._canvas).keyup(e => e.key === action.hotkey ? this._confirmAction(action) : null);
+        });
     }
 
     _refreshAreaSelection() {
@@ -59,8 +62,6 @@ class massAction {
         $(this._canvas).prepend(this._areaSelectionDiv);
         $(this._canvas).on('mousedown', this._MouseDown.bind(this));
         $(this._canvas).mouseup(this._MouseUp.bind(this));
-        $(this._canvas).keyup(e => e.key === "Escape" ? this._unselectAll() : null);
-        $(this._canvas).keyup(e => e.key === "Delete" ? alert('Deseja mesmo apagar?') : null);
         $('[massaction]').contextmenu(this._ContextMenu.bind(this));
     }
 
@@ -72,7 +73,7 @@ class massAction {
     _MouseDown(e){
 
         this.isMouseDown = 1;
-        if(!this._isEventAllowed(e)) return;
+        if(!this._isEventAllowed(e) || this.locked) return;
         e.preventDefault();
         e.stopPropagation();
 
@@ -92,7 +93,7 @@ class massAction {
         this.y1 = e.clientY;
         this.x2 = e.clientX;
         this.y2 = e.clientY;
-        // this._refreshAreaSelection();
+        this._refreshAreaSelection();
     }
 
     _MouseMove(e){
@@ -119,7 +120,7 @@ class massAction {
         e.preventDefault();
         $('#contextmenu').remove();
         $(this._canvas).append(this._renderContextMenu(e));
-        this._assignActionsClickEvents();
+        this._assignActionsEvents();
     }
 
     _renderContextMenu(e){
@@ -127,9 +128,10 @@ class massAction {
         return `
             <div id='contextmenu' class='list-group shadow' style='position:absolute;top:${e.pageY}px;left:${e.pageX}px'>
                 ${this._actions.map(action => `
-                    <li class='list-group-item list-group-item-action text-left p-2 lh-0' name='${action.name}'>
-                        <i class='fas fa-${action.icon}-circle text-${action.type} mr-2'></i>
-                        <label>${action.label}</label>
+                    <li class='list-group-item list-group-item-action text-left p-2' name='${action.name}'>
+                        <i class='fas fa-${action.icon}-circle text-${action.type} my-auto'></i>
+                        <label class='m-0'>${action.label}</label>
+                        <i class='text-right'><i class='fas fa-keyboard mr-1'></i>${action.hotkey}</i>
                     </li>
                 `).join('')}
             </div>
@@ -154,6 +156,7 @@ class massAction {
 
     _mapElements() {
 
+        this.items = [];
         $(this._elements).each((index, item) => {
 
             var checkbox = document.createElement('input');
@@ -215,7 +218,7 @@ class massAction {
 
         $(this._canvas).append(newButton);
         $(this._canvas).append(this._renderActionList());
-        this._assignActionsClickEvents();
+        this._assignActionsEvents();
     }
 
     _removeActionElements(){
@@ -229,8 +232,11 @@ class massAction {
         return `
             <ul id='massaction-actions'>
                 ${this._actions.map(action => `
-                    <li class='badge-pill text-right'>
-                        <label>${action.label}</label>
+                    <li class='badge-pill text-right grid-8-2'>
+                        <label class='m-0 grid-4-6'>
+                            <i class='text-left'><i class='fas fa-keyboard mr-2'></i>${action.hotkey}</i>
+                            ${action.label}
+                        </label>
                         <button class='btn btn-${action.type} rounded-circle ml-2' name='${action.name}'>
                             <i class='fas fa-${action.icon}'></i>
                         </button>
@@ -240,17 +246,55 @@ class massAction {
         `;
     }
 
+    _confirmAction(action){
+
+        this.locked = 1;
+        let confirmDiv = document.createElement('div');
+        confirmDiv.innerHTML = `Deseja mesmo <i>${action.label}</i> <b>${this.selected.length}</b> objeto(s)?`;
+        confirmDiv.style.fontSize = '18px';
+
+        let self = this;
+        $(confirmDiv).dialog({
+            title: 'Confirmar ação',
+            show: true,
+            hide: true,
+            resizable: false,
+            draggable: false,
+            height: "auto",
+            width: 600,
+            modal: true,
+            buttons: {
+                "Cancelar": function(){ $(this).dialog("close"); self.locked = 0 },
+                "Confirmar": this._doAction.bind(this, action)
+            }
+        });
+    }
+
     _doAction(action){
 
-        let postsRemaining = this.selected.length;
+        let promises = [];
+        console.log(this.selected);
         this.selected.forEach(itemName => {
 
-            let item = this.items[itemName];
-            let jQueryString = 'input[name=_token],' + action.fields.map(field => `input[name*=\'[${field}]\']`);
-            $.post(action.route, item.form.find(jQueryString).serialize()).done(data => {
-                postsRemaining--;
-                if(!postsRemaining) window.location.reload();
-            });
+            promises.push(new Promise((resolve, reject) => {
+                let item = this.items[itemName];
+                let jQueryString = 'input[name=_token],';
+                jQueryString += action.fields.map(field => `input[name*=\'[${field}]\']`);
+                $.post(action.route, item.form.find(jQueryString).serialize())
+                    .done(data => resolve(data))
+                    .fail(data => reject(data));
+            }));
+            console.log(`Promised ${itemName}`);
         });
+
+        this.locked = 0;
+
+        Promise.all(promises)
+            .then(resp => {
+
+                console.log(resp);
+                if(this._reloadAfterDone) window.location.reload();
+            })
+            .catch(resp => console.log(resp));
     }
 }
